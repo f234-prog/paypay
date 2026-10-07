@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>雙語生活化 採購追蹤表</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:"Microsoft JhengHei",sans-serif;margin:0;background:#f1f4f9;color:#222}
+header{background:#2b6cb0;color:#fff;padding:12px 16px;position:sticky;top:0;z-index:5}
+header h1{margin:0;font-size:18px}
+.wrap{padding:12px;max-width:1100px;margin:auto}
+.sum{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.s{background:#fff;border-radius:10px;padding:8px 12px;box-shadow:0 1px 3px #0002;font-size:13px}
+.s b{display:block;font-size:19px;color:#2b6cb0}
+.bar{height:10px;background:#d9dee7;border-radius:5px;overflow:hidden;margin:10px 0}
+.bar div{height:100%;width:0;background:#38a169;transition:.3s}
+.tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.tools input{grid-column:1/3}
+input,select,button{width:100%;padding:9px;border:1px solid #bbb;border-radius:8px;font-size:16px;background:#fff}
+button{background:#2b6cb0;color:#fff;border:0;cursor:pointer}
+.btns{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
+.btns .g{background:#718096}
+.list{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:700px){.list{grid-template-columns:1fr 1fr}.sum{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:1000px){.list{grid-template-columns:1fr 1fr 1fr}}
+.card{background:#fff;border-radius:12px;padding:12px;box-shadow:0 1px 4px #0002;border-left:6px solid #a0aec0}
+.card.st1{border-color:#ed8936}.card.st2{border-color:#3182ce}.card.st3{border-color:#38a169;background:#f0fff4}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:10px;color:#fff;margin-right:4px}
+.c0{background:#805ad5}.c1{background:#dd6b20}.c2{background:#319795}.c3{background:#d53f8c}
+.row{display:flex;gap:8px;margin-top:8px}
+.row>div{flex:1}
+label{font-size:12px;color:#666;display:block;margin-bottom:2px}
+.total{font-size:20px;font-weight:bold;color:#2b6cb0;text-align:right;margin-top:6px}
+.del{background:#e53e3e;margin-top:8px}
+.empty{text-align:center;color:#888;padding:30px}
+</style></head><body>
+<header><h1>📋 115學年度雙語生活化 採購追蹤表</h1></header>
+<div class="wrap">
+<div class="sum">
+<div class="s">預算總額<b id="t1">0</b></div>
+<div class="s">已驗收/核銷<b id="t2">0</b></div>
+<div class="s">尚未完成<b id="t3">0</b></div>
+<div class="s">執行率<b id="t4">0%</b></div></div>
+<div class="bar"><div id="pb"></div></div>
+<div class="tools">
+<select id="fc"><option value="">全部類別</option><option>軟體</option><option>硬體</option><option>圖書</option><option>教師進修</option></select>
+<select id="fs"><option value="">全部狀態</option><option>未採購</option><option>請購中</option><option>已驗收</option><option>已核銷</option></select>
+<input id="q" placeholder="🔍 搜尋品名">
+</div>
+<div class="btns">
+<button onclick="addRow()">＋ 新增項目</button>
+<button onclick="exportCSV()">⬇ 匯出CSV</button>
+<button class="g" onclick="document.getElementById('imp').click()">⬆ 匯入CSV</button>
+<button class="g" onclick="if(confirm('確定還原預設?')){localStorage.removeItem('proc2');init()}">↺ 還原預設</button>
+<input type="file" id="imp" accept=".csv" style="display:none">
+</div>
+<div class="list" id="list"></div>
+</div>
+<script>
+const ST=["未採購","請購中","已驗收","已核銷"],CT=["軟體","硬體","圖書","教師進修"];
+const DEF=[
+["軟體","二","Canva Pro 一年授權(2 user)",2,5200,"","單價依計畫書"],
+["軟體","二","Claude Pro 一年授權(2 user)",2,8750,"",""],
+["軟體","三","Claude Pro 一年授權(1 user)",1,8750,"",""],
+["軟體","三","Padlet(10 user)",10,3000,"",""],
+["硬體","三","IPS 15.6吋可攜式雙屏螢幕",2,8800,"","物品費"],
+["圖書","二","老師上課必備英文7000句",2,550,"",""],
+["圖書","二","老師天天在用雙語教學萬用句(附音檔QR)",2,480,"",""],
+["圖書","二","半導體科技英語 半導體基礎30問",2,650,"",""],
+["圖書","二","科技業英語溝通指南",2,380,"",""],
+["圖書","二","1本就通!英文狀態表達大小事",2,499,"",""],
+["圖書","二","迪士尼夢想之書【中英雙語】",2,699,"",""],
+["圖書","三","老師上課必備英文7000句",3,550,"",""],
+["教師進修","二","研習/社群會議膳費(人次)",20,120,"","每餐上限120元"],
+["教師進修","二","國內旅費(臺灣師大研習等)人次",4,2700,"","依出差旅費報支要點"],
+["教師進修","二","研習資料印刷(份)",20,200,"",""],
+["教師進修","三","社群會議及教師研習 膳費(人次)",60,120,"",""],
+["教師進修","三","國內旅費 高鐵台南↔台北(人次)",2,2700,"","1,350x2"],
+["教師進修","三","研習資料印刷(份)",20,200,"",""]
+].map(r=>({c:r[0],s:r[1],n:r[2],q:r[3],p:r[4],st:"未採購",d:r[5],m:r[6]}));
+let D;const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const f=n=>n.toLocaleString();
+function init(){D=JSON.parse(localStorage.getItem('proc2')||'null')||DEF;render()}
+function save(){localStorage.setItem('proc2',JSON.stringify(D));render()}
+function upd(i,k,v){D[i][k]=(k=='q'||k=='p')?(+v||0):v;save()}
+function del(i){if(confirm('刪除此項?')){D.splice(i,1);save()}}
+function addRow(){D.unshift({c:"軟體",s:"",n:"新項目",q:1,p:0,st:"未採購",d:"",m:""});$('fc').value='';$('fs').value='';$('q').value='';save()}
+function render(){
+ const fc=$('fc').value,fs=$('fs').value,q=$('q').value;
+ let tot=0,done=0,h='';
+ D.forEach((r,i)=>{const t=r.q*r.p;tot+=t;if(r.st=="已驗收"||r.st=="已核銷")done+=t;
+  if((fc&&r.c!=fc)||(fs&&r.st!=fs)||(q&&!r.n.includes(q)))return;
+  const si=ST.indexOf(r.st),ci=CT.indexOf(r.c);
+  h+=`<div class="card st${si}">
+  <div><span class="tag c${ci}">${r.c}</span><span class="tag" style="background:#718096">子計畫${esc(r.s)||'?'}</span></div>
+  <div class="row"><div><label>品名/規格</label><input value="${esc(r.n)}" onchange="upd(${i},'n',this.value)"></div></div>
+  <div class="row">
+   <div><label>類別</label><select onchange="upd(${i},'c',this.value)">${CT.map(x=>`<option ${x==r.c?'selected':''}>${x}</option>`).join('')}</select></div>
+   <div><label>子計畫</label><input value="${esc(r.s)}" onchange="upd(${i},'s',this.value)"></div></div>
+  <div class="row">
+   <div><label>數量</label><input type="number" inputmode="numeric" value="${r.q}" onchange="upd(${i},'q',this.value)"></div>
+   <div><label>單價</label><input type="number" inputmode="numeric" value="${r.p}" onchange="upd(${i},'p',this.value)"></div></div>
+  <div class="total">NT$ ${f(t)}</div>
+  <div class="row">
+   <div><label>狀態</label><select onchange="upd(${i},'st',this.value)">${ST.map(x=>`<option ${x==r.st?'selected':''}>${x}</option>`).join('')}</select></div>
+   <div><label>預計時程</label><input type="date" value="${r.d}" onchange="upd(${i},'d',this.value)"></div></div>
+  <div class="row"><div><label>備註</label><input value="${esc(r.m)}" onchange="upd(${i},'m',this.value)"></div></div>
+  <button class="del" onclick="del(${i})">🗑 刪除</button></div>`});
+ $('list').innerHTML=h||'<div class="empty">沒有符合的項目</div>';
+ const pct=tot?Math.round(done/tot*100):0;
+ $('t1').textContent=f(tot);$('t2').textContent=f(done);$('t3').textContent=f(tot-done);$('t4').textContent=pct+'%';$('pb').style.width=pct+'%';
+}
+['fc','fs'].forEach(id=>$(id).onchange=render);$('q').oninput=render;
+function exportCSV(){
+ const s="類別,子計畫,品名,數量,單價,總價,狀態,預計時程,備註\n"+D.map(r=>[r.c,r.s,r.n,r.q,r.p,r.q*r.p,r.st,r.d,r.m].map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(["\ufeff"+s],{type:'text/csv'}));a.download='採購追蹤表.csv';a.click()}
+function parseCSV(t){const rows=[];let r=[],c='',q=false;
+ for(let i=0;i<t.length;i++){const ch=t[i];
+  if(q){if(ch=='"'){if(t[i+1]=='"'){c+='"';i++}else q=false}else c+=ch}
+  else if(ch=='"')q=true;else if(ch==','){r.push(c);c=''}
+  else if(ch=='\n'||ch=='\r'){if(ch=='\r'&&t[i+1]=='\n')i++;r.push(c);rows.push(r);r=[];c=''}
+  else c+=ch}
+ if(c||r.length){r.push(c);rows.push(r)}return rows}
+$('imp').onchange=e=>{const file=e.target.files[0];if(!file)return;
+ const rd=new FileReader();rd.onload=()=>{
+  const rows=parseCSV(rd.result.replace(/^\ufeff/,'')).slice(1).filter(r=>r.length>=8);
+  if(!rows.length){alert('格式不符');return}
+  if(!confirm('將以匯入的 '+rows.length+' 筆取代目前資料,確定嗎?'))return;
+  D=rows.map(r=>({c:r[0],s:r[1],n:r[2],q:+r[3]||0,p:+r[4]||0,st:ST.includes(r[6])?r[6]:"未採購",d:r[7]||'',m:r[8]||''}));
+  save()};rd.readAsText(file);e.target.value=''};
+init();
+</script></body></html>
